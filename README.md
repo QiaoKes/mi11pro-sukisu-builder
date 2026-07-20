@@ -3,6 +3,11 @@
 为 Xiaomi Mi 11 Pro（`mars / M2102K1AC`）的 MIUI 14 内核构建可测试的
 SukiSU Ultra 内核与 AnyKernel3 刷机包。
 
+> [!WARNING]
+> 固定的 5.4.283 基线已于 2026-07-21 在 Mi 11 Pro / MIUI 14 上完成真机
+> 临时启动测试。即使关闭 ZRAM Dedup，SukiSU 管理器仍未检测到驱动，设备随后
+> 出现整机卡死并重启。现有 5.4.283 制品仅供诊断，禁止刷入 boot 分区。
+
 ## 固定基线
 
 - 设备：Xiaomi Mi 11 Pro（`mars`）
