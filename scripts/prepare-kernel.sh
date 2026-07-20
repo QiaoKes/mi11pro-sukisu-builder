@@ -72,6 +72,11 @@ case "$mode" in
       patch --directory=KernelSU --strip=1 --forward \
         < "$builder_dir/patches/sukisu-android-5.4-seccomp-no-cache.patch"
     fi
+
+    if ! grep -q 'handle_inode_event' include/linux/fsnotify_backend.h; then
+      patch --directory=KernelSU --strip=1 --forward \
+        < "$builder_dir/patches/sukisu-android-5.4-fsnotify.patch"
+    fi
     ;;
   *)
     echo "Unsupported build mode: $mode" >&2
