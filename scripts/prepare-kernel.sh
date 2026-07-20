@@ -30,6 +30,15 @@ case "$mode" in
         '/#include <linux\/pgtable.h>/d' \
         KernelSU/kernel/feature/sucompat.c
     fi
+
+    # This 5.4 tree has the pre-rename no-fault user string helper. Select it
+    # only when the newer API is absent and the compatible API is declared.
+    if ! grep -q 'strncpy_from_user_nofault' include/linux/uaccess.h \
+      && grep -q 'strncpy_from_unsafe_user' include/linux/uaccess.h; then
+      find KernelSU/kernel -type f \( -name '*.c' -o -name '*.h' \) \
+        -exec sed -i \
+          's/strncpy_from_user_nofault/strncpy_from_unsafe_user/g' {} +
+    fi
     ;;
   *)
     echo "Unsupported build mode: $mode" >&2
