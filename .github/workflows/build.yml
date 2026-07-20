@@ -19,9 +19,14 @@ on:
           - baseline
           - sukisu
       enable_kpm:
-        description: Enable experimental KPM support after the basic build is proven bootable
+        description: Enable KPM support
         required: true
-        default: false
+        default: true
+        type: boolean
+      enable_susfs:
+        description: Port SUSFS 1.5.5 with the conservative Xiaomi 5.4 feature set
+        required: true
+        default: true
         type: boolean
       kernel_ref:
         description: Pinned MIUI SM8350 kernel commit
@@ -37,15 +42,18 @@ concurrency:
 
 jobs:
   build:
-    name: ${{ inputs.mode || 'sukisu' }} / KPM ${{ inputs.enable_kpm || false }}
+    name: ${{ inputs.mode || 'sukisu' }} / KPM ${{ github.event_name != 'workflow_dispatch' || inputs.enable_kpm }} / SUSFS ${{ github.event_name != 'workflow_dispatch' || inputs.enable_susfs }}
     runs-on: ubuntu-22.04
     timeout-minutes: 120
     env:
       KERNEL_REPO: https://github.com/EndCredits/android_kernel_xiaomi_sm8350-miui.git
       BUILD_MODE: ${{ inputs.mode || 'sukisu' }}
-      ENABLE_KPM: ${{ inputs.enable_kpm || false }}
+      ENABLE_KPM: ${{ github.event_name != 'workflow_dispatch' || inputs.enable_kpm }}
+      ENABLE_SUSFS: ${{ github.event_name != 'workflow_dispatch' || inputs.enable_susfs }}
       KERNEL_REF: ${{ inputs.kernel_ref || '6cb9f5a9edc161abda546ee23c8f8ba741655746' }}
       SUKISU_REF: builtin
+      SUSFS_REPO: https://gitlab.com/simonpunk/susfs4ksu.git
+      SUSFS_REF: 76affd70abf61d77feb0a132f61365d6848505df
       TOOLCHAIN_URL: https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/tags/android-11.0.0_r48/clang-r383902b1.tar.gz
       KBUILD_BUILD_USER: QiaoKes
       KBUILD_BUILD_HOST: github-actions
@@ -71,13 +79,24 @@ jobs:
           git -C kernel checkout --detach FETCH_HEAD
           echo "Kernel source: $(git -C kernel rev-parse HEAD)"
 
+      - name: Fetch pinned SUSFS source
+        if: env.BUILD_MODE == 'sukisu' && env.ENABLE_SUSFS == 'true'
+        run: |
+          git init susfs
+          git -C susfs remote add origin "$SUSFS_REPO"
+          git -C susfs fetch --depth=1 origin "$SUSFS_REF"
+          git -C susfs checkout --detach FETCH_HEAD
+          echo "SUSFS_COMMIT=$(git -C susfs rev-parse HEAD)" >> "$GITHUB_ENV"
+
       - name: Prepare kernel source
         run: |
           scripts/prepare-kernel.sh \
             kernel \
             "$BUILD_MODE" \
             "$SUKISU_REF" \
-            "$ENABLE_KPM"
+            "$ENABLE_KPM" \
+            "$ENABLE_SUSFS" \
+            "$GITHUB_WORKSPACE/susfs"
           echo "SUKISU_COMMIT=$(git -C kernel/KernelSU rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - name: Restore AOSP Clang cache
@@ -115,10 +134,11 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: out
-          key: mi11pro-out-${{ runner.os }}-${{ inputs.mode || 'sukisu' }}-${{ inputs.enable_kpm || false }}-${{ env.KERNEL_REF }}-${{ env.SUKISU_REF }}-${{ env.SUKISU_COMMIT }}-${{ hashFiles('scripts/prepare-kernel.sh', 'patches/**') }}-${{ github.run_id }}
+          key: mi11pro-out-${{ runner.os }}-${{ inputs.mode || 'sukisu' }}-${{ env.ENABLE_KPM }}-${{ env.ENABLE_SUSFS }}-${{ env.KERNEL_REF }}-${{ env.SUKISU_REF }}-${{ env.SUKISU_COMMIT }}-${{ env.SUSFS_COMMIT }}-${{ hashFiles('scripts/prepare-kernel.sh', 'patches/**') }}-${{ github.run_id }}
           restore-keys: |
-            mi11pro-out-${{ runner.os }}-${{ inputs.mode || 'sukisu' }}-${{ inputs.enable_kpm || false }}-${{ env.KERNEL_REF }}-${{ env.SUKISU_REF }}-${{ env.SUKISU_COMMIT }}-${{ hashFiles('scripts/prepare-kernel.sh', 'patches/**') }}-
-            mi11pro-out-${{ runner.os }}-${{ inputs.mode || 'sukisu' }}-${{ inputs.enable_kpm || false }}-${{ env.KERNEL_REF }}-${{ env.SUKISU_REF }}-${{ env.SUKISU_COMMIT }}-
+            mi11pro-out-${{ runner.os }}-${{ inputs.mode || 'sukisu' }}-${{ env.ENABLE_KPM }}-${{ env.ENABLE_SUSFS }}-${{ env.KERNEL_REF }}-${{ env.SUKISU_REF }}-${{ env.SUKISU_COMMIT }}-${{ env.SUSFS_COMMIT }}-${{ hashFiles('scripts/prepare-kernel.sh', 'patches/**') }}-
+            mi11pro-out-${{ runner.os }}-${{ inputs.mode || 'sukisu' }}-${{ env.ENABLE_KPM }}-${{ env.ENABLE_SUSFS }}-${{ env.KERNEL_REF }}-${{ env.SUKISU_REF }}-${{ env.SUKISU_COMMIT }}-${{ env.SUSFS_COMMIT }}-
+            mi11pro-out-${{ runner.os }}-${{ inputs.mode || 'sukisu' }}-${{ env.ENABLE_KPM }}-
 
       - name: Normalize source timestamps for cached objects
         if: steps.kernel-cache.outputs.cache-matched-key != ''
@@ -132,15 +152,17 @@ jobs:
           find kernel/KernelSU \
             -type d -name .git -prune -o \
             -type f -exec touch --date="@$sukisu_epoch" {} +
-          # A broad fallback may come from an older patch revision. Make only
-          # the patched translation units newer than their cached objects.
-          touch \
-            kernel/fs/exec.c \
-            kernel/fs/open.c \
-            kernel/fs/read_write.c \
-            kernel/fs/stat.c \
-            kernel/KernelSU/kernel/runtime/ksud.c \
-            kernel/KernelSU/kernel/sulog/event.c
+          # A broad fallback may come from an older integration revision.
+          # Retimestamp every changed source so make rebuilds only what changed.
+          (
+            cd kernel
+            git diff --name-only -z HEAD -- . ':!KernelSU' | xargs -0 -r touch
+            git ls-files --others --exclude-standard -z -- . ':!KernelSU' | xargs -0 -r touch
+          )
+          (
+            cd kernel/KernelSU
+            git diff --name-only -z HEAD | xargs -0 -r touch
+          )
           echo "Restored: ${{ steps.kernel-cache.outputs.cache-matched-key }}"
 
       - name: Smoke-build SukiSU objects
@@ -198,19 +220,21 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: out
-          key: mi11pro-out-${{ runner.os }}-${{ inputs.mode || 'sukisu' }}-${{ inputs.enable_kpm || false }}-${{ env.KERNEL_REF }}-${{ env.SUKISU_REF }}-${{ env.SUKISU_COMMIT }}-${{ hashFiles('scripts/prepare-kernel.sh', 'patches/**') }}-${{ github.run_id }}
+          key: mi11pro-out-${{ runner.os }}-${{ inputs.mode || 'sukisu' }}-${{ env.ENABLE_KPM }}-${{ env.ENABLE_SUSFS }}-${{ env.KERNEL_REF }}-${{ env.SUKISU_REF }}-${{ env.SUKISU_COMMIT }}-${{ env.SUSFS_COMMIT }}-${{ hashFiles('scripts/prepare-kernel.sh', 'patches/**') }}-${{ github.run_id }}
 
       - name: Verify and collect release files
         run: |
           scripts/collect-release.sh \
             kernel \
             "$BUILD_MODE" \
-            "$ENABLE_KPM"
+            "$ENABLE_KPM" \
+            "$ENABLE_SUSFS" \
+            "${SUSFS_COMMIT:-not-applicable}"
 
       - name: Upload kernel package
         uses: actions/upload-artifact@v4
         with:
-          name: mi11pro-${{ inputs.mode || 'sukisu' }}-${{ github.run_number }}
+          name: mi11pro-${{ inputs.mode || 'sukisu' }}-kpm-${{ env.ENABLE_KPM }}-susfs-${{ env.ENABLE_SUSFS }}-${{ github.run_number }}
           path: release/
           if-no-files-found: error
           retention-days: 14
