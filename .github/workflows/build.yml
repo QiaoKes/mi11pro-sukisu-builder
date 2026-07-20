@@ -118,6 +118,7 @@ jobs:
           key: mi11pro-out-${{ runner.os }}-${{ inputs.mode || 'sukisu' }}-${{ inputs.enable_kpm || false }}-${{ env.KERNEL_REF }}-${{ env.SUKISU_REF }}-${{ env.SUKISU_COMMIT }}-${{ hashFiles('scripts/prepare-kernel.sh', 'patches/**') }}-${{ github.run_id }}
           restore-keys: |
             mi11pro-out-${{ runner.os }}-${{ inputs.mode || 'sukisu' }}-${{ inputs.enable_kpm || false }}-${{ env.KERNEL_REF }}-${{ env.SUKISU_REF }}-${{ env.SUKISU_COMMIT }}-${{ hashFiles('scripts/prepare-kernel.sh', 'patches/**') }}-
+            mi11pro-out-${{ runner.os }}-${{ inputs.mode || 'sukisu' }}-${{ inputs.enable_kpm || false }}-${{ env.KERNEL_REF }}-${{ env.SUKISU_REF }}-${{ env.SUKISU_COMMIT }}-
 
       - name: Normalize source timestamps for cached objects
         if: steps.kernel-cache.outputs.cache-matched-key != ''
@@ -131,6 +132,15 @@ jobs:
           find kernel/KernelSU \
             -type d -name .git -prune -o \
             -type f -exec touch --date="@$sukisu_epoch" {} +
+          # A broad fallback may come from an older patch revision. Make only
+          # the patched translation units newer than their cached objects.
+          touch \
+            kernel/fs/exec.c \
+            kernel/fs/open.c \
+            kernel/fs/read_write.c \
+            kernel/fs/stat.c \
+            kernel/KernelSU/kernel/runtime/ksud.c \
+            kernel/KernelSU/kernel/sulog/event.c
           echo "Restored: ${{ steps.kernel-cache.outputs.cache-matched-key }}"
 
       - name: Smoke-build SukiSU objects

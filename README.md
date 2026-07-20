@@ -13,8 +13,9 @@ SukiSU Ultra 内核与 AnyKernel3 刷机包。
 - SukiSU：[SukiSU-Ultra/SukiSU-Ultra](https://github.com/SukiSU-Ultra/SukiSU-Ultra)
 - 工具链：AOSP Clang `r383902b1`
 
-工作流固定内核源码提交，并通过 SukiSU 官方 `kernel/setup.sh` 集成
-`builtin` 分支。默认启用 `CONFIG_KSU=y`，关闭 KPM，不包含 SUSFS。
+工作流固定内核源码提交，通过 SukiSU 官方 `kernel/setup.sh` 集成
+`builtin` 分支，并按官方 non-GKI 指南接入手动 hook。默认启用
+`CONFIG_KSU=y`，关闭 KPM，不包含 SUSFS。
 
 ## 构建
 
@@ -48,6 +49,10 @@ curl -LSs \
 ```
 
 源码原有的旧 KernelSU 子模块会先被移除，避免官方脚本误用旧仓库。
+官方 `setup.sh` 只负责把驱动接入 Kconfig 和 Makefile；`builtin` 用于
+non-GKI 时还必须在 `execveat`、`faccessat`、`vfs_read` 和 `stat` 入口调用
+SukiSU handler。本项目保存一份仅针对固定 5.4 源码提交的手动 hook 补丁，
+并在构建前逐项验证四个调用均已落入目标源码。
 `builtin` 分支自身提供 Android 5.4 所需的 seccomp、fsnotify、SELinux 和
 nofault API 兼容层。工作流会检查实际检出的分支，防止误用只面向新 GKI 的
 主线代码。
@@ -68,7 +73,9 @@ SukiSU `builtin` 的 Kconfig 默认可能打开 SUSFS；本项目会显式写入
 `builtin` 的实际提交、构建模式、KPM 设置和准备脚本摘要。失败构建也会用本次
 运行的唯一键保存已完成对象；后续运行只恢复源码和配置完全一致的最新缓存。
 恢复后将新检出源码的时间戳归一到对应 Git 提交时间，避免 `make` 因新 Runner
-的检出时间较晚而误判所有源码都需要重编。
+的检出时间较晚而误判所有源码都需要重编。补丁摘要变化时允许回退到同一内核和
+SukiSU 提交的旧缓存，但会把所有补丁目标文件重新标记为已修改，确保只重编受影响
+的对象并重新链接，不会静默复用旧 hook。
 
 ## 安全边界
 

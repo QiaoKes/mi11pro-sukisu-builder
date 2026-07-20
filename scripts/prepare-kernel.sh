@@ -29,6 +29,11 @@ case "$mode" in
 
     patch --directory=KernelSU --strip=1 --forward \
       < "$builder_dir/patches/sukisu-builtin-5.4-build-fixes.patch"
+
+    # SukiSU's builtin branch is a manual-hook integration for non-GKI
+    # kernels. setup.sh wires in the driver; these hooks make it reachable.
+    patch --strip=1 --forward \
+      < "$builder_dir/patches/sukisu-manual-hooks-5.4.patch"
     ;;
   *)
     echo "Unsupported build mode: $mode" >&2
@@ -68,6 +73,10 @@ grep -q '^CONFIG_KALLSYMS_ALL=y$' "$defconfig"
 grep -q '^CONFIG_EXT4_FS=y$' "$defconfig"
 if [[ "$mode" == "sukisu" ]]; then
   grep -q '^# CONFIG_KSU_SUSFS is not set$' "$defconfig"
+  grep -Fq 'ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags)' fs/exec.c
+  grep -Fq 'ksu_handle_faccessat(&dfd, &filename, &mode, NULL)' fs/open.c
+  grep -Fq 'ksu_handle_vfs_read(&file, &buf, &count, &pos)' fs/read_write.c
+  grep -Fq 'ksu_handle_stat(&dfd, &filename, &flags)' fs/stat.c
 fi
 grep -q '^do.devicecheck=1$' "$anykernel"
 grep -q '^device.name1=mars$' "$anykernel"
