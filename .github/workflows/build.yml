@@ -1,0 +1,120 @@
+name: Build Mi 11 Pro SukiSU kernel
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Build a vanilla baseline or integrate SukiSU
+        required: true
+        default: sukisu
+        type: choice
+        options:
+          - baseline
+          - sukisu
+      enable_kpm:
+        description: Enable experimental KPM support after the basic build is proven bootable
+        required: true
+        default: false
+        type: boolean
+      kernel_ref:
+        description: Pinned MIUI SM8350 kernel commit
+        required: true
+        default: 6cb9f5a9edc161abda546ee23c8f8ba741655746
+        type: string
+      sukisu_ref:
+        description: SukiSU tag or commit used by the official setup script
+        required: true
+        default: v4.1.3
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mi11pro-kernel-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: ${{ inputs.mode }} / KPM ${{ inputs.enable_kpm }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    env:
+      KERNEL_REPO: https://github.com/EndCredits/android_kernel_xiaomi_sm8350-miui.git
+      KERNEL_REF: ${{ inputs.kernel_ref }}
+      SUKISU_REF: ${{ inputs.sukisu_ref }}
+      TOOLCHAIN_URL: https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/tags/android-11.0.0_r48/clang-r383902b1.tar.gz
+      KBUILD_BUILD_USER: QiaoKes
+      KBUILD_BUILD_HOST: github-actions
+
+    steps:
+      - name: Check out builder
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            bc bison build-essential ca-certificates curl device-tree-compiler \
+            flex gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi git libelf-dev \
+            libncurses-dev libssl-dev lld llvm python3 python-is-python3 \
+            rsync unzip zip
+
+      - name: Fetch pinned kernel source
+        run: |
+          git init kernel
+          git -C kernel remote add origin "$KERNEL_REPO"
+          git -C kernel fetch --depth=1 origin "$KERNEL_REF"
+          git -C kernel checkout --detach FETCH_HEAD
+          echo "Kernel source: $(git -C kernel rev-parse HEAD)"
+
+      - name: Prepare kernel source
+        run: |
+          scripts/prepare-kernel.sh \
+            kernel \
+            "${{ inputs.mode }}" \
+            "$SUKISU_REF" \
+            "${{ inputs.enable_kpm }}"
+
+      - name: Install matching AOSP Clang
+        run: |
+          mkdir -p toolchain
+          curl --fail --location --show-error --silent \
+            "$TOOLCHAIN_URL" \
+            --output clang-r383902b1.tar.gz
+          tar -xzf clang-r383902b1.tar.gz -C toolchain
+          echo "$GITHUB_WORKSPACE/toolchain/bin" >> "$GITHUB_PATH"
+
+      - name: Show compiler
+        run: clang --version
+
+      - name: Build star kernel and AnyKernel3
+        run: |
+          set -o pipefail
+          cd kernel
+          chmod +x build.sh
+          ./build.sh cleanbuild star 0 2>&1 | tee ../build.log
+
+      - name: Verify and collect release files
+        run: |
+          scripts/collect-release.sh \
+            kernel \
+            "${{ inputs.mode }}" \
+            "${{ inputs.enable_kpm }}"
+
+      - name: Upload kernel package
+        uses: actions/upload-artifact@v4
+        with:
+          name: mi11pro-${{ inputs.mode }}-${{ github.run_number }}
+          path: release/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mi11pro-build-log-${{ github.run_number }}
+          path: build.log
+          if-no-files-found: ignore
+          retention-days: 7

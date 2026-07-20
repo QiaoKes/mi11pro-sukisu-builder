@@ -1,0 +1,6 @@
+/kernel/
+/out/
+/release/
+/toolchain/
+/build.log
+/*.tar.gz
