@@ -141,6 +141,16 @@ jobs:
             LLVM=1 \
             LLVM_IAS=1 \
             -j"$(nproc)" \
+            security/selinux/
+          make -C kernel \
+            O=../out \
+            ARCH=arm64 \
+            CC=clang \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+            LLVM=1 \
+            LLVM_IAS=1 \
+            -j"$(nproc)" \
             drivers/kernelsu/
 
       - name: Build star kernel and AnyKernel3
