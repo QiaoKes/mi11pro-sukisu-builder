@@ -42,37 +42,11 @@ case "$mode" in
       < "$builder_dir/patches/sukisu-manual-hooks-5.4.patch"
 
     if [[ "$enable_susfs" == "true" ]]; then
-      test -s "$susfs_dir/kernel_patches/50_add_susfs_in_kernel-5.4.patch"
-      install -m 0644 "$susfs_dir/kernel_patches/fs/susfs.c" fs/susfs.c
-      install -m 0644 "$susfs_dir/kernel_patches/include/linux/susfs.h" include/linux/susfs.h
-      install -m 0644 "$susfs_dir/kernel_patches/include/linux/susfs_def.h" include/linux/susfs_def.h
-
-      # The upstream 5.4 patch targets generic Android common. Exclude the
-      # paths where Xiaomi differs, then apply the reviewed local adaptation.
-      apply_status=0
-      git apply --reject --whitespace=nowarn \
-        --exclude=fs/exec.c \
-        --exclude=fs/proc/bootconfig.c \
-        --exclude=fs/proc/fd.c \
-        --exclude=fs/proc/task_mmu.c \
-        --exclude=include/linux/mount.h \
-        "$susfs_dir/kernel_patches/50_add_susfs_in_kernel-5.4.patch" \
-        || apply_status=$?
-
-      # These are the only expected overlaps: Xiaomi's vfs_create_mount()
-      # layout and obsolete SUS_SU hooks already covered by Manual Hook.
-      [[ "$apply_status" -eq 1 ]]
-      rejects=$(find fs include kernel -type f -name '*.rej' -print \
-        | sort | tr '\n' ' ')
-      [[ "$rejects" == \
-        "fs/namespace.c.rej fs/open.c.rej fs/stat.c.rej " ]]
-      grep -Fq 'alloc_vfsmnt(fc->source ?: "none", true, 0)' fs/namespace.c.rej
-      grep -Fq 'CONFIG_KSU_SUSFS_SUS_SU' fs/open.c.rej
-      grep -Fq 'CONFIG_KSU_SUSFS_SUS_SU' fs/stat.c.rej
-
-      git apply --whitespace=nowarn \
-        "$builder_dir/patches/susfs-1.5.5-xiaomi-5.4-adaptations.patch"
-      rm -f fs/namespace.c.rej fs/open.c.rej fs/stat.c.rej
+      susfs_patch="$susfs_dir/Patches/Patch/susfs_patch_to_5.4.patch"
+      test -s "$susfs_patch"
+      git apply --check --whitespace=nowarn "$susfs_patch"
+      git apply --whitespace=nowarn "$susfs_patch"
+      grep -Fq '#define SUSFS_VERSION "v2.2.0"' include/linux/susfs.h
     fi
     ;;
   *)

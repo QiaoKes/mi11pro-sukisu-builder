@@ -24,7 +24,7 @@ on:
         default: true
         type: boolean
       enable_susfs:
-        description: Port SUSFS 1.5.5 with the conservative Xiaomi 5.4 feature set
+        description: Port SUSFS 2.2.0 to the Xiaomi 5.4 kernel
         required: true
         default: true
         type: boolean
@@ -52,8 +52,8 @@ jobs:
       ENABLE_SUSFS: ${{ github.event_name != 'workflow_dispatch' || inputs.enable_susfs }}
       KERNEL_REF: ${{ inputs.kernel_ref || '6cb9f5a9edc161abda546ee23c8f8ba741655746' }}
       SUKISU_REF: builtin
-      SUSFS_REPO: https://gitlab.com/simonpunk/susfs4ksu.git
-      SUSFS_REF: 76affd70abf61d77feb0a132f61365d6848505df
+      SUSFS_REPO: https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd.git
+      SUSFS_REF: 1ad267cd0a793849127cd549ba460d559017d533
       TOOLCHAIN_URL: https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/tags/android-11.0.0_r48/clang-r383902b1.tar.gz
       KBUILD_BUILD_USER: QiaoKes
       KBUILD_BUILD_HOST: github-actions
