@@ -111,14 +111,27 @@ jobs:
         run: clang --version
 
       - name: Restore incremental kernel objects
+        id: kernel-cache
         uses: actions/cache/restore@v4
         with:
           path: out
           key: mi11pro-out-${{ runner.os }}-${{ inputs.mode || 'sukisu' }}-${{ inputs.enable_kpm || false }}-${{ env.KERNEL_REF }}-${{ env.SUKISU_REF }}-${{ env.SUKISU_COMMIT }}-${{ hashFiles('scripts/prepare-kernel.sh', 'patches/**') }}-${{ github.run_id }}
           restore-keys: |
             mi11pro-out-${{ runner.os }}-${{ inputs.mode || 'sukisu' }}-${{ inputs.enable_kpm || false }}-${{ env.KERNEL_REF }}-${{ env.SUKISU_REF }}-${{ env.SUKISU_COMMIT }}-${{ hashFiles('scripts/prepare-kernel.sh', 'patches/**') }}-
-            mi11pro-out-${{ runner.os }}-${{ inputs.mode || 'sukisu' }}-${{ inputs.enable_kpm || false }}-${{ env.KERNEL_REF }}-${{ env.SUKISU_REF }}-${{ env.SUKISU_COMMIT }}-
-            mi11pro-out-${{ runner.os }}-${{ inputs.mode || 'sukisu' }}-${{ inputs.enable_kpm || false }}-${{ env.KERNEL_REF }}-${{ env.SUKISU_REF }}-
+
+      - name: Normalize source timestamps for cached objects
+        if: steps.kernel-cache.outputs.cache-matched-key != ''
+        run: |
+          kernel_epoch=$(git -C kernel show -s --format=%ct HEAD)
+          sukisu_epoch=$(git -C kernel/KernelSU show -s --format=%ct HEAD)
+          find kernel \
+            -type d -name .git -prune -o \
+            -type f -not -path 'kernel/KernelSU/*' \
+            -exec touch --date="@$kernel_epoch" {} +
+          find kernel/KernelSU \
+            -type d -name .git -prune -o \
+            -type f -exec touch --date="@$sukisu_epoch" {} +
+          echo "Restored: ${{ steps.kernel-cache.outputs.cache-matched-key }}"
 
       - name: Smoke-build SukiSU objects
         run: |
