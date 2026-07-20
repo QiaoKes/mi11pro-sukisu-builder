@@ -22,6 +22,14 @@ case "$mode" in
 
     test "$(git -C KernelSU remote get-url origin)" = \
       "https://github.com/SukiSU-Ultra/SukiSU-Ultra"
+
+    # SukiSU v4.1.3 includes this newer header without using any declaration
+    # from it. Android 5.4 GKI 1.0 has only arch/arm64/include/asm/pgtable.h.
+    if [[ ! -e include/linux/pgtable.h ]]; then
+      sed -i \
+        '/#include <linux\/pgtable.h>/d' \
+        KernelSU/kernel/feature/sucompat.c
+    fi
     ;;
   *)
     echo "Unsupported build mode: $mode" >&2

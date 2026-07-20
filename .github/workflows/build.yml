@@ -100,7 +100,8 @@ jobs:
           set -o pipefail
           cd kernel
           chmod +x build.sh
-          ./build.sh cleanbuild star 0 2>&1 | tee ../build.log
+          ./build.sh all star 0 2>&1 | tee ../build.log
+          test -s ../out/arch/arm64/boot/Image
 
       - name: Verify and collect release files
         run: |
