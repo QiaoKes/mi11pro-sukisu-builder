@@ -1,6 +1,11 @@
 name: Build Mi 11 Pro SukiSU kernel
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/build.yml
   workflow_dispatch:
     inputs:
       mode:
@@ -36,13 +41,15 @@ concurrency:
 
 jobs:
   build:
-    name: ${{ inputs.mode }} / KPM ${{ inputs.enable_kpm }}
+    name: ${{ inputs.mode || 'sukisu' }} / KPM ${{ inputs.enable_kpm || false }}
     runs-on: ubuntu-22.04
     timeout-minutes: 120
     env:
       KERNEL_REPO: https://github.com/EndCredits/android_kernel_xiaomi_sm8350-miui.git
-      KERNEL_REF: ${{ inputs.kernel_ref }}
-      SUKISU_REF: ${{ inputs.sukisu_ref }}
+      BUILD_MODE: ${{ inputs.mode || 'sukisu' }}
+      ENABLE_KPM: ${{ inputs.enable_kpm || false }}
+      KERNEL_REF: ${{ inputs.kernel_ref || '6cb9f5a9edc161abda546ee23c8f8ba741655746' }}
+      SUKISU_REF: ${{ inputs.sukisu_ref || 'v4.1.3' }}
       TOOLCHAIN_URL: https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/tags/android-11.0.0_r48/clang-r383902b1.tar.gz
       KBUILD_BUILD_USER: QiaoKes
       KBUILD_BUILD_HOST: github-actions
@@ -72,9 +79,9 @@ jobs:
         run: |
           scripts/prepare-kernel.sh \
             kernel \
-            "${{ inputs.mode }}" \
+            "$BUILD_MODE" \
             "$SUKISU_REF" \
-            "${{ inputs.enable_kpm }}"
+            "$ENABLE_KPM"
 
       - name: Install matching AOSP Clang
         run: |
@@ -99,13 +106,13 @@ jobs:
         run: |
           scripts/collect-release.sh \
             kernel \
-            "${{ inputs.mode }}" \
-            "${{ inputs.enable_kpm }}"
+            "$BUILD_MODE" \
+            "$ENABLE_KPM"
 
       - name: Upload kernel package
         uses: actions/upload-artifact@v4
         with:
-          name: mi11pro-${{ inputs.mode }}-${{ github.run_number }}
+          name: mi11pro-${{ inputs.mode || 'sukisu' }}-${{ github.run_number }}
           path: release/
           if-no-files-found: error
           retention-days: 14
