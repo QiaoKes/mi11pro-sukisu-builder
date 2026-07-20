@@ -13,6 +13,7 @@ release_dir="$workspace/release"
 test -s "$out_dir/arch/arm64/boot/Image"
 test -s "$out_dir/.config"
 grep -q '^CONFIG_BOARD_XIAOMI_STAR=y$' "$out_dir/.config"
+grep -q '^# CONFIG_ZRAM_DEDUP is not set$' "$out_dir/.config"
 
 if [[ "$mode" == "sukisu" ]]; then
   grep -q '^CONFIG_KSU=y$' "$out_dir/.config"
@@ -56,6 +57,7 @@ fi
   echo "mode=$mode"
   echo "kpm=$enable_kpm"
   echo "susfs=$enable_susfs"
+  echo "zram_dedup=false"
   echo "kernel_source=https://github.com/EndCredits/android_kernel_xiaomi_sm8350-miui"
   echo "kernel_commit=$kernel_commit"
   echo "sukisu_source=https://github.com/SukiSU-Ultra/SukiSU-Ultra"

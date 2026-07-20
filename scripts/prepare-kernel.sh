@@ -57,9 +57,14 @@ esac
 
 defconfig=arch/arm64/configs/vendor/star_defconfig
 sed -i.bak -E \
-  '/^(# )?CONFIG_(KSU|KSU_DEBUG|KPM|KSU_SUSFS.*)(=| is not set)/d' \
+  '/^(# )?CONFIG_(KSU|KSU_DEBUG|KPM|KSU_SUSFS.*|ZRAM_DEDUP)(=| is not set)/d' \
   "$defconfig"
 rm -f "$defconfig.bak"
+
+# This 5.4.283 branch enables its out-of-tree ZRAM dedup implementation by
+# default. A device minidump captured a fatal use-after-free-style fault in
+# zram_dedup_put_entry(), so keep normal ZRAM but compile dedup out.
+printf '\n# CONFIG_ZRAM_DEDUP is not set\n' >> "$defconfig"
 
 if [[ "$mode" == "sukisu" ]]; then
   printf '\nCONFIG_KSU=y\n# CONFIG_KSU_DEBUG is not set\n' >> "$defconfig"
@@ -103,6 +108,7 @@ rm -f "$anykernel.bak"
 grep -q '^CONFIG_KPROBES=y$' "$defconfig"
 grep -q '^CONFIG_KALLSYMS_ALL=y$' "$defconfig"
 grep -q '^CONFIG_EXT4_FS=y$' "$defconfig"
+grep -q '^# CONFIG_ZRAM_DEDUP is not set$' "$defconfig"
 if [[ "$mode" == "sukisu" ]]; then
   if [[ "$enable_susfs" == "true" ]]; then
     grep -q '^CONFIG_KSU_SUSFS=y$' "$defconfig"

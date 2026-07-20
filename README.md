@@ -17,6 +17,11 @@ SukiSU Ultra 内核与 AnyKernel3 刷机包。
 `builtin` 分支，并按官方 non-GKI 指南接入手动 hook。SukiSU 构建默认启用
 `CONFIG_KSU=y`、KPM，以及回移到 Android 5.4 的 SUSFS 2.2.0。
 
+固定的 5.4.283 源码包含一套默认开启的非上游 ZRAM Dedup 实现。真机 minidump
+显示内核在 `zram_dedup_put_entry()` 释放交换页时发生致命异常，因此构建流程
+强制设置 `# CONFIG_ZRAM_DEDUP is not set`。这只关闭去重扩展，普通 ZRAM 压缩
+交换保持启用；产物收集阶段会检查最终 `.config`，防止该设置被其他配置覆盖。
+
 ## 构建
 
 1. 打开仓库的 **Actions** 页面。
