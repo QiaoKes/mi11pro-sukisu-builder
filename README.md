@@ -55,8 +55,9 @@ nofault API 兼容层，构建器不再修改 SukiSU 实现。工作流会检查
 SukiSU `builtin` 的 Kconfig 默认可能打开 SUSFS；本项目会显式写入
 `# CONFIG_KSU_SUSFS is not set`，确保第一轮产物只包含 SukiSU 核心。
 
-完整编译前会先生成 SELinux 头文件，再单独编译 `drivers/kernelsu/`，用于快速
-验证 SukiSU 与目标 5.4 内核的 API 兼容性。该步骤通过后才开始完整内核构建。
+完整编译前会先生成内核编译元数据和 SELinux 头文件，再单独编译
+`drivers/kernelsu/`，用于快速验证 SukiSU 与目标 5.4 内核的 API 兼容性。
+该步骤通过后才开始完整内核构建。
 
 工作流缓存固定 Clang 工具链和 `out/` 中间对象。缓存键包含内核提交、SukiSU
 `builtin` 的实际提交、构建模式、KPM 设置和准备脚本摘要。失败构建也会用本次
