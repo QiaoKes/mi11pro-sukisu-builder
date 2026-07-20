@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+builder_dir=$(cd -- "$script_dir/.." && pwd)
 kernel_dir=${1:?kernel source directory is required}
 mode=${2:?build mode is required}
 sukisu_ref=${3:?SukiSU ref is required}
@@ -59,6 +61,11 @@ case "$mode" in
       find KernelSU/kernel -type f \( -name '*.c' -o -name '*.h' \) \
         -exec sed -i \
           's/copy_to_user_nofault/probe_user_write/g' {} +
+    fi
+
+    if ! grep -q 'security_inode_init_security_anon' include/linux/security.h; then
+      patch --directory=KernelSU --strip=1 --forward \
+        < "$builder_dir/patches/sukisu-android-5.4-anon-inode.patch"
     fi
     ;;
   *)

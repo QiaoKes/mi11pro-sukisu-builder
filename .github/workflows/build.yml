@@ -83,17 +83,65 @@ jobs:
             "$SUKISU_REF" \
             "$ENABLE_KPM"
 
+      - name: Restore AOSP Clang cache
+        id: clang-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: toolchain
+          key: aosp-clang-r383902b1-linux-x86-v1
+
       - name: Install matching AOSP Clang
+        if: steps.clang-cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p toolchain
           curl --fail --location --show-error --silent \
             "$TOOLCHAIN_URL" \
             --output clang-r383902b1.tar.gz
           tar -xzf clang-r383902b1.tar.gz -C toolchain
+
+      - name: Save AOSP Clang cache
+        if: steps.clang-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: toolchain
+          key: aosp-clang-r383902b1-linux-x86-v1
+
+      - name: Add compiler to PATH
+        run: |
           echo "$GITHUB_WORKSPACE/toolchain/bin" >> "$GITHUB_PATH"
 
       - name: Show compiler
         run: clang --version
+
+      - name: Restore incremental kernel objects
+        uses: actions/cache/restore@v4
+        with:
+          path: out
+          key: mi11pro-out-${{ runner.os }}-${{ inputs.mode || 'sukisu' }}-${{ inputs.enable_kpm || false }}-${{ env.KERNEL_REF }}-${{ env.SUKISU_REF }}-${{ hashFiles('scripts/prepare-kernel.sh', 'patches/**') }}
+          restore-keys: |
+            mi11pro-out-${{ runner.os }}-${{ inputs.mode || 'sukisu' }}-${{ inputs.enable_kpm || false }}-${{ env.KERNEL_REF }}-${{ env.SUKISU_REF }}-
+
+      - name: Smoke-build SukiSU objects
+        run: |
+          make -C kernel \
+            O=../out \
+            ARCH=arm64 \
+            CC=clang \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+            LLVM=1 \
+            LLVM_IAS=1 \
+            vendor/star_defconfig
+          make -C kernel \
+            O=../out \
+            ARCH=arm64 \
+            CC=clang \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+            LLVM=1 \
+            LLVM_IAS=1 \
+            -j"$(nproc)" \
+            drivers/kernelsu/
 
       - name: Build star kernel and AnyKernel3
         run: |
@@ -102,6 +150,13 @@ jobs:
           chmod +x build.sh
           ./build.sh all star 0 2>&1 | tee ../build.log
           test -s ../out/arch/arm64/boot/Image
+
+      - name: Save incremental kernel objects
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: out
+          key: mi11pro-out-${{ runner.os }}-${{ inputs.mode || 'sukisu' }}-${{ inputs.enable_kpm || false }}-${{ env.KERNEL_REF }}-${{ env.SUKISU_REF }}-${{ hashFiles('scripts/prepare-kernel.sh', 'patches/**') }}
 
       - name: Verify and collect release files
         run: |
