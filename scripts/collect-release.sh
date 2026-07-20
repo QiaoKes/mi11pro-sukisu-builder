@@ -14,6 +14,12 @@ grep -q '^CONFIG_BOARD_XIAOMI_STAR=y$' "$out_dir/.config"
 
 if [[ "$mode" == "sukisu" ]]; then
   grep -q '^CONFIG_KSU=y$' "$out_dir/.config"
+  grep -q '^# CONFIG_KSU_SUSFS is not set$' "$out_dir/.config"
+  if [[ "$enable_kpm" == "true" ]]; then
+    grep -q '^CONFIG_KPM=y$' "$out_dir/.config"
+  else
+    grep -q '^# CONFIG_KPM is not set$' "$out_dir/.config"
+  fi
 else
   grep -q '^# CONFIG_KSU is not set$' "$out_dir/.config"
 fi

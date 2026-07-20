@@ -6,6 +6,8 @@ on:
       - main
     paths:
       - .github/workflows/build.yml
+      - scripts/**
+      - patches/**
   workflow_dispatch:
     inputs:
       mode:
@@ -26,12 +28,6 @@ on:
         required: true
         default: 6cb9f5a9edc161abda546ee23c8f8ba741655746
         type: string
-      sukisu_ref:
-        description: SukiSU tag or commit used by the official setup script
-        required: true
-        default: v4.1.3
-        type: string
-
 permissions:
   contents: read
 
@@ -49,7 +45,7 @@ jobs:
       BUILD_MODE: ${{ inputs.mode || 'sukisu' }}
       ENABLE_KPM: ${{ inputs.enable_kpm || false }}
       KERNEL_REF: ${{ inputs.kernel_ref || '6cb9f5a9edc161abda546ee23c8f8ba741655746' }}
-      SUKISU_REF: ${{ inputs.sukisu_ref || 'v4.1.3' }}
+      SUKISU_REF: builtin
       TOOLCHAIN_URL: https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/tags/android-11.0.0_r48/clang-r383902b1.tar.gz
       KBUILD_BUILD_USER: QiaoKes
       KBUILD_BUILD_HOST: github-actions
@@ -82,6 +78,7 @@ jobs:
             "$BUILD_MODE" \
             "$SUKISU_REF" \
             "$ENABLE_KPM"
+          echo "SUKISU_COMMIT=$(git -C kernel/KernelSU rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - name: Restore AOSP Clang cache
         id: clang-cache
@@ -117,8 +114,10 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: out
-          key: mi11pro-out-${{ runner.os }}-${{ inputs.mode || 'sukisu' }}-${{ inputs.enable_kpm || false }}-${{ env.KERNEL_REF }}-${{ env.SUKISU_REF }}-${{ hashFiles('scripts/prepare-kernel.sh', 'patches/**') }}
+          key: mi11pro-out-${{ runner.os }}-${{ inputs.mode || 'sukisu' }}-${{ inputs.enable_kpm || false }}-${{ env.KERNEL_REF }}-${{ env.SUKISU_REF }}-${{ env.SUKISU_COMMIT }}-${{ hashFiles('scripts/prepare-kernel.sh', 'patches/**') }}-${{ github.run_id }}
           restore-keys: |
+            mi11pro-out-${{ runner.os }}-${{ inputs.mode || 'sukisu' }}-${{ inputs.enable_kpm || false }}-${{ env.KERNEL_REF }}-${{ env.SUKISU_REF }}-${{ env.SUKISU_COMMIT }}-${{ hashFiles('scripts/prepare-kernel.sh', 'patches/**') }}-
+            mi11pro-out-${{ runner.os }}-${{ inputs.mode || 'sukisu' }}-${{ inputs.enable_kpm || false }}-${{ env.KERNEL_REF }}-${{ env.SUKISU_REF }}-${{ env.SUKISU_COMMIT }}-
             mi11pro-out-${{ runner.os }}-${{ inputs.mode || 'sukisu' }}-${{ inputs.enable_kpm || false }}-${{ env.KERNEL_REF }}-${{ env.SUKISU_REF }}-
 
       - name: Smoke-build SukiSU objects
@@ -166,7 +165,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: out
-          key: mi11pro-out-${{ runner.os }}-${{ inputs.mode || 'sukisu' }}-${{ inputs.enable_kpm || false }}-${{ env.KERNEL_REF }}-${{ env.SUKISU_REF }}-${{ hashFiles('scripts/prepare-kernel.sh', 'patches/**') }}
+          key: mi11pro-out-${{ runner.os }}-${{ inputs.mode || 'sukisu' }}-${{ inputs.enable_kpm || false }}-${{ env.KERNEL_REF }}-${{ env.SUKISU_REF }}-${{ env.SUKISU_COMMIT }}-${{ hashFiles('scripts/prepare-kernel.sh', 'patches/**') }}-${{ github.run_id }}
 
       - name: Verify and collect release files
         run: |

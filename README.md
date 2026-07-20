@@ -13,8 +13,8 @@ SukiSU Ultra 内核与 AnyKernel3 刷机包。
 - SukiSU：[SukiSU-Ultra/SukiSU-Ultra](https://github.com/SukiSU-Ultra/SukiSU-Ultra)
 - 工具链：AOSP Clang `r383902b1`
 
-工作流固定内核源码提交，并通过 SukiSU 官方 `kernel/setup.sh` 集成指定标签。
-默认构建 SukiSU `v4.1.3`，启用 `CONFIG_KSU=y`，关闭 KPM，不包含 SUSFS。
+工作流固定内核源码提交，并通过 SukiSU 官方 `kernel/setup.sh` 集成
+`builtin` 分支。默认启用 `CONFIG_KSU=y`，关闭 KPM，不包含 SUSFS。
 
 ## 构建
 
@@ -39,47 +39,28 @@ Artifact 包含：
 目标内核已启用 `CONFIG_KPROBES=y`、`CONFIG_KALLSYMS_ALL=y` 和
 `CONFIG_EXT4_FS=y`。工作流按照
 [SukiSU 官方集成指南](https://github.com/SukiSU-Ultra/SukiSU-Ultra/blob/main/docs/guide/how-to-integrate.md)
-执行：
+执行官方针对 built-in / non-GKI 内核指定的命令：
 
 ```sh
 curl -LSs \
   "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" \
-  | bash -s v4.1.3
+  | bash -s builtin
 ```
 
 源码原有的旧 KernelSU 子模块会先被移除，避免官方脚本误用旧仓库。
+`builtin` 分支自身提供 Android 5.4 所需的 seccomp、fsnotify、SELinux 和
+nofault API 兼容层，构建器不再修改 SukiSU 实现。工作流会检查实际检出的分支，
+防止误用只面向新 GKI 的主线代码。
 
-SukiSU `v4.1.3` 的 `sucompat.c` 还包含一个未使用的
-`linux/pgtable.h`。该头文件不存在于 Android 5.4 GKI 1.0 源码中，工作流仅在
-确认头文件缺失时移除这条未使用的 include；不修改 SukiSU 的执行逻辑。
-
-Android 5.4 将无缺页用户字符串读取接口命名为
-`strncpy_from_unsafe_user()`；新内核将其重命名为
-`strncpy_from_user_nofault()`。工作流检查目标内核实际声明，并在新名称缺失时将
-SukiSU 调用切换到 5.4 提供的等价接口。
-
-同理，5.4 的 `probe_kernel_write()`、`probe_user_read()` 和
-`probe_user_write()` 分别是新内核 `copy_to_kernel_nofault()`、
-`copy_from_user_nofault()` 和 `copy_to_user_nofault()` 的前身。工作流仅在
-新接口缺失且旧接口存在时进行对应替换。
-
-目标 5.4 内核没有 `security_inode_init_security_anon()`。工作流按 SukiSU
-官方 `builtin` 分支对 4.19+ 内核的实现，在该接口缺失时跳过匿名 inode 的额外
-security 初始化；补丁保存在仓库中并在应用失败时停止构建。
-
-目标 5.4 的 seccomp 实现没有新内核的 action cache。工作流检测到该能力缺失时
-不编译 SukiSU 的 cache 结构镜像，并将 cache 更新接口变为无操作；因为目标内核
-没有缓存需要更新，这避免了用错误结构布局访问 `seccomp_filter`。
-
-目标内核的 fsnotify 仍使用旧版 `handle_event` 回调。工作流根据内核头文件检测
-接口并切换 SukiSU 的包列表监听回调签名，包管理器变更检测功能保持启用。
+SukiSU `builtin` 的 Kconfig 默认可能打开 SUSFS；本项目会显式写入
+`# CONFIG_KSU_SUSFS is not set`，确保第一轮产物只包含 SukiSU 核心。
 
 完整编译前会先生成 SELinux 头文件，再单独编译 `drivers/kernelsu/`，用于快速
 验证 SukiSU 与目标 5.4 内核的 API 兼容性。该步骤通过后才开始完整内核构建。
 
-工作流缓存固定 Clang 工具链和 `out/` 中间对象。失败构建也会保存已完成的
-内核对象；当内核提交、SukiSU 版本、构建模式和 KPM 设置不变时，后续运行会
-恢复兼容的增量缓存，只重新编译受兼容脚本或补丁影响的文件。
+工作流缓存固定 Clang 工具链和 `out/` 中间对象。缓存键包含内核提交、SukiSU
+`builtin` 的实际提交、构建模式、KPM 设置和准备脚本摘要。失败构建也会用本次
+运行的唯一键保存已完成对象；后续运行先恢复最新兼容缓存，只重编变化部分。
 
 ## 安全边界
 
