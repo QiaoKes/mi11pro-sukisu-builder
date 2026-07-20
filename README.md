@@ -58,6 +58,11 @@ Android 5.4 将无缺页用户字符串读取接口命名为
 `strncpy_from_user_nofault()`。工作流检查目标内核实际声明，并在新名称缺失时将
 SukiSU 调用切换到 5.4 提供的等价接口。
 
+同理，5.4 的 `probe_kernel_write()`、`probe_user_read()` 和
+`probe_user_write()` 分别是新内核 `copy_to_kernel_nofault()`、
+`copy_from_user_nofault()` 和 `copy_to_user_nofault()` 的前身。工作流仅在
+新接口缺失且旧接口存在时进行对应替换。
+
 ## 安全边界
 
 编译成功只说明源码和工具链可用，不代表内核已经在这台手机上验证可启动。

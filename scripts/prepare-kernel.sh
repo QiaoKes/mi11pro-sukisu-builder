@@ -39,6 +39,27 @@ case "$mode" in
         -exec sed -i \
           's/strncpy_from_user_nofault/strncpy_from_unsafe_user/g' {} +
     fi
+
+    if ! grep -q 'copy_to_kernel_nofault' include/linux/uaccess.h \
+      && grep -q 'probe_kernel_write' include/linux/uaccess.h; then
+      find KernelSU/kernel -type f \( -name '*.c' -o -name '*.h' \) \
+        -exec sed -i \
+          's/copy_to_kernel_nofault/probe_kernel_write/g' {} +
+    fi
+
+    if ! grep -q 'copy_from_user_nofault' include/linux/uaccess.h \
+      && grep -q 'probe_user_read' include/linux/uaccess.h; then
+      find KernelSU/kernel -type f \( -name '*.c' -o -name '*.h' \) \
+        -exec sed -i \
+          's/copy_from_user_nofault/probe_user_read/g' {} +
+    fi
+
+    if ! grep -q 'copy_to_user_nofault' include/linux/uaccess.h \
+      && grep -q 'probe_user_write' include/linux/uaccess.h; then
+      find KernelSU/kernel -type f \( -name '*.c' -o -name '*.h' \) \
+        -exec sed -i \
+          's/copy_to_user_nofault/probe_user_write/g' {} +
+    fi
     ;;
   *)
     echo "Unsupported build mode: $mode" >&2
