@@ -49,8 +49,13 @@ curl -LSs \
 
 源码原有的旧 KernelSU 子模块会先被移除，避免官方脚本误用旧仓库。
 `builtin` 分支自身提供 Android 5.4 所需的 seccomp、fsnotify、SELinux 和
-nofault API 兼容层，构建器不再修改 SukiSU 实现。工作流会检查实际检出的分支，
-防止误用只面向新 GKI 的主线代码。
+nofault API 兼容层。工作流会检查实际检出的分支，防止误用只面向新 GKI 的
+主线代码。
+
+当前 `builtin` 分支仍有两处 5.4 编译缺口：低版本排除 SELinux-hide 实现后仍
+调用其可选函数，以及 sulog 的空 `user_arg_ptr` 宏类型不匹配。本仓库保存一份
+最小补丁，为 `<5.10` 跳过不存在的调用并修正值/指针类型；补丁上下文不匹配时
+构建会立即停止，避免上游更新后静默套用错误修改。
 
 SukiSU `builtin` 的 Kconfig 默认可能打开 SUSFS；本项目会显式写入
 `# CONFIG_KSU_SUSFS is not set`，确保第一轮产物只包含 SukiSU 核心。

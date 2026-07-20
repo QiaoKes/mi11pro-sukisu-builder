@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+builder_dir=$(cd -- "$script_dir/.." && pwd)
 kernel_dir=${1:?kernel source directory is required}
 mode=${2:?build mode is required}
 sukisu_ref=${3:?SukiSU ref is required}
@@ -24,6 +26,9 @@ case "$mode" in
       "https://github.com/SukiSU-Ultra/SukiSU-Ultra"
 
     test "$(git -C KernelSU branch --show-current)" = "builtin"
+
+    patch --directory=KernelSU --strip=1 --forward \
+      < "$builder_dir/patches/sukisu-builtin-5.4-build-fixes.patch"
     ;;
   *)
     echo "Unsupported build mode: $mode" >&2
